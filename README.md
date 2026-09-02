@@ -489,22 +489,3 @@ static/index.html
 
 ---
 
-## Run the Project
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Run the application:
-
-```bash
-python main.py
-```
-
-Then open:
-
-```text
-http://localhost:8000
-```
