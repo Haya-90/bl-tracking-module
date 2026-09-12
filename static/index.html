@@ -349,6 +349,63 @@ async function openPanel(id){
 
   document.getElementById('panel').classList.add('open');
   document.getElementById('scrim').classList.add('open');
+
+  if(s.status !== 'booked' && s.status !== 'cancelled'){
+    loadShipsGoTracking(s.id);
+  }
+}
+
+async function loadShipsGoTracking(id){
+  const body = document.getElementById('p-body');
+  const box = document.createElement('div');
+  box.className = 'field-group live-position';
+  box.innerHTML = `<h4>Live tracking <span style="font-weight:400;color:var(--ink-soft);">— ShipsGo</span></h4><div class="live-status">Checking…</div>`;
+  body.appendChild(box);
+  const statusEl = box.querySelector('.live-status');
+
+  try{
+    const resp = await fetch(`${API}/bl/${id}/live-position`);
+    const data = await resp.json();
+
+    if(resp.status === 503){
+      statusEl.innerHTML = `<span style="color:var(--ink-soft);">${data.detail}</span>`;
+      return;
+    }
+    if(!data.available){
+      if(data.registered === false){
+        statusEl.innerHTML = `
+          <div style="color:var(--ink-soft);margin-bottom:8px;">${data.reason}</div>
+          <button onclick="registerShipsGo(${id})" style="background:var(--ink);color:#fff;border:none;border-radius:7px;padding:8px 12px;font-family:'Inter',sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;">Register with ShipsGo (uses 1 credit)</button>
+        `;
+      }else{
+        statusEl.innerHTML = `<span style="color:var(--ink-soft);">${data.reason}</span>`;
+      }
+      return;
+    }
+    statusEl.innerHTML = `
+      <div class="field-row"><dt>Status</dt><dd>${data.status || '—'}</dd></div>
+      ${data.carrier ? `<div class="field-row"><dt>Carrier</dt><dd>${data.carrier}</dd></div>` : ''}
+      ${data.origin_port ? `<div class="field-row"><dt>Origin</dt><dd>${data.origin_port}</dd></div>` : ''}
+      ${data.destination_port ? `<div class="field-row"><dt>Destination</dt><dd>${data.destination_port}</dd></div>` : ''}
+      ${data.transit_time_days != null ? `<div class="field-row"><dt>Transit time</dt><dd>${data.transit_time_days} day(s)</dd></div>` : ''}
+      ${data.transit_percentage != null ? `<div class="field-row"><dt>Progress</dt><dd>${data.transit_percentage}%</dd></div>` : ''}
+      ${data.pieces != null ? `<div class="field-row"><dt>Pieces</dt><dd>${data.pieces}</dd></div>` : ''}
+      <div class="field-row"><dt>Source</dt><dd style="font-size:11px;">${data.source}</dd></div>
+    `;
+  }catch(err){
+    statusEl.innerHTML = `<span style="color:var(--red);">Could not reach the backend for tracking data.</span>`;
+  }
+}
+
+async function registerShipsGo(id){
+  const resp = await fetch(`${API}/bl/${id}/register-live-tracking`, {method: 'POST'});
+  const data = await resp.json().catch(()=>({detail: 'Unknown error'}));
+  if(!resp.ok){
+    toast(data.detail || 'Could not register with ShipsGo', true);
+    return;
+  }
+  toast(data.already_existed ? 'Already tracked with ShipsGo - no credit used' : 'Registered with ShipsGo — 1 credit used');
+  loadShipsGoTracking(id);
 }
 function closePanel(){
   document.getElementById('panel').classList.remove('open');
