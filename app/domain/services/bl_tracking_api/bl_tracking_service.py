@@ -114,6 +114,7 @@ def _serialize(record: BLTracking) -> dict:
         "notes": record.notes,
         "created_at": record.created_at,
         "updated_at": record.updated_at,
+        "shipsgo_shipment_id": record.shipsgo_shipment_id,
         "transit_days": compute_transit_days(record.atd, record.ata),
         "transit_label": compute_transit_label(
             record.status, record.etd, record.eta, record.atd, record.ata

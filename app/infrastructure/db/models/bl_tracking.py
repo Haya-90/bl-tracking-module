@@ -122,6 +122,13 @@ class BLTracking(Base):
 
     notes = Column(Text, nullable=True)
 
+    # ShipsGo's internal numeric shipment id, captured once when this
+    # record is registered for live tracking (see shipment_tracking_service
+    # .register_tracking_for_bl). Null until registered. ShipsGo's v2 API
+    # requires this id for every subsequent lookup — the AWB/BL number
+    # alone isn't a valid lookup key after creation.
+    shipsgo_shipment_id = Column(Integer, nullable=True)
+
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

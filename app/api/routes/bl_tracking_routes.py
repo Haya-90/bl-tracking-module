@@ -42,6 +42,15 @@ from app.domain.services.bl_tracking_api import (
     BLStatusTransitionError,
     BLDeleteNotAllowedError,
 )
+from app.domain.services.bl_tracking_api.shipment_tracking_service import (
+    get_tracking_for_bl,
+    register_tracking_for_bl,
+    ShipsGoNotConfigured,
+    ShipsGoOutOfCredits,
+    ShipsGoForbidden,
+    ShipsGoUnavailable,
+    ShipsGoRequestError,
+)
 from app.infrastructure.db.models.bl_tracking import BLMode, BLDirection, BLStatus
 
 router = APIRouter(prefix="/bl", tags=["bl-tracking"])
@@ -142,6 +151,56 @@ def update_bl_status_route(
     except BLStatusTransitionError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     except BLValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/{bl_id}/live-position")
+def get_live_tracking_route(
+    bl_id: int,
+    db=Depends(get_db),
+    org_id: int = Depends(get_current_org_id),
+):
+    """
+    Read-only. Fetches shipment tracking data from ShipsGo (ocean BL
+    tracking, or air AWB tracking) IF the shipment has already been
+    registered. Never registers anything itself, never consumes a credit.
+    """
+    try:
+        bl = get_bl(db, org_id=org_id, bl_id=bl_id)
+    except BLNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    try:
+        return get_tracking_for_bl(bl)
+    except ShipsGoNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+
+@router.post("/{bl_id}/register-live-tracking")
+def register_live_tracking_route(
+    bl_id: int,
+    db=Depends(get_db),
+    org_id: int = Depends(get_current_org_id),
+):
+    """
+    Explicit, deliberate action: registers this shipment with ShipsGo.
+    THIS CONSUMES 1 SHIPSGO CREDIT (unless ShipsGo recognizes it as an
+    existing duplicate, which their docs say is free). Never called
+    automatically — only from a dedicated button the user clicks on purpose.
+    """
+    try:
+        return register_tracking_for_bl(db, org_id=org_id, bl_id=bl_id)
+    except BLNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ShipsGoNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except ShipsGoOutOfCredits as exc:
+        raise HTTPException(status_code=402, detail=str(exc))
+    except ShipsGoForbidden as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ShipsGoUnavailable as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    except ShipsGoRequestError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
 
